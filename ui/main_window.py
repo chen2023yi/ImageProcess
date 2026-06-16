@@ -219,9 +219,8 @@ class MainWindow(QMainWindow):
         self.result_meta_label.setMaximumHeight(72)
         self.color_value_label = QLabel()
         self.color_value_label.setObjectName("MetaLabel")
-        self.color_swatch = ColorSwatch("Click to pick this color from the image")
-        self.color_swatch.clicked.connect(self.enable_color_picker)
-        self.color_swatch.set_click_enabled(False)
+        self.color_swatch = ColorSwatch("Click to choose the target background color")
+        self.color_swatch.clicked.connect(self.choose_background_color)
         self.color_badge = QLabel()
         self.color_badge.setObjectName("Badge")
         self.tolerance_value_label = QLabel()
@@ -242,9 +241,6 @@ class MainWindow(QMainWindow):
         self.original_canvas.image_pixel_selected.connect(self.pick_background_color)
         self.processed_canvas = ImageCanvas("Cleaned preview", checkerboard=True)
 
-        self.import_button = QPushButton("Import Image")
-        self.import_button.clicked.connect(self.open_image_dialog)
-
         self.drop_button = QPushButton("Drop image here or click")
         self.drop_button.setObjectName("DropButton")
         self.drop_button.clicked.connect(self.open_image_dialog)
@@ -253,9 +249,6 @@ class MainWindow(QMainWindow):
         self.process_button.setObjectName("PrimaryButton")
         self.process_button.clicked.connect(self.process_current_image)
         self.process_button.setEnabled(False)
-
-        self.reset_color_button = QPushButton("Reset to Green")
-        self.reset_color_button.clicked.connect(self.reset_background_color)
 
         self.mode_combo = QComboBox()
         self.mode_combo.addItem("Picked color", MODE_COLOR)
@@ -368,7 +361,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel("File"))
         layout.addWidget(self.file_meta_label)
         layout.addStretch(1)
-        layout.addWidget(self.import_button)
         return frame
 
     def _build_preview_panel(
@@ -440,7 +432,7 @@ class MainWindow(QMainWindow):
         color_row.setSpacing(10)
         color_text_column = QVBoxLayout()
         color_text_column.setSpacing(4)
-        color_label = QLabel("Selected color")
+        color_label = QLabel("Target color")
         color_label.setObjectName("MetaLabel")
         color_text_column.addWidget(color_label)
         color_text_column.addWidget(self.color_value_label)
@@ -494,7 +486,6 @@ class MainWindow(QMainWindow):
         settings_layout.addWidget(self.mode_combo)
         settings_layout.addWidget(self.mode_help_label)
         settings_layout.addLayout(color_row)
-        settings_layout.addWidget(self.reset_color_button)
         settings_layout.addSpacing(2)
         settings_layout.addLayout(tolerance_header)
         settings_layout.addWidget(self.tolerance_slider)
@@ -573,7 +564,6 @@ class MainWindow(QMainWindow):
         self.original_canvas.set_pixmap(self._pil_to_pixmap(image))
         self.processed_canvas.set_pixmap(None)
         self.process_button.setEnabled(True)
-        self.color_swatch.set_click_enabled(True)
         self.export_button.setEnabled(False)
         self._update_status("Image imported")
 
@@ -657,30 +647,26 @@ class MainWindow(QMainWindow):
         self.original_canvas.set_pick_enabled(True)
         self._update_status("Click the background color in the original preview")
 
+    def choose_background_color(self) -> None:
+        color = self._choose_rgb_color(
+            current_color=self.background_color,
+            title="Choose Target Background Color",
+        )
+        if color is None:
+            return
+
+        self.original_canvas.set_pick_enabled(False)
+        self._apply_background_color_choice(color)
+        self._update_status(f"Selected target color RGB{color}")
+
     def pick_background_color(self, image_x: int, image_y: int) -> None:
         if self.original_image is None:
             return
 
         red, green, blue, _alpha = self.original_image.getpixel((image_x, image_y))
         self.original_canvas.set_pick_enabled(False)
-        self._set_background_color((red, green, blue), invalidate_result=True)
-
-        if self._is_light_neutral_color((red, green, blue)):
-            self._select_background_mode(MODE_LIGHT_NEUTRAL)
-            self._update_status(
-                f"Picked RGB({red}, {green}, {blue}) and selected light/gray mode"
-            )
-        else:
-            self._select_background_mode(MODE_COLOR)
-            self._update_status(
-                f"Picked RGB({red}, {green}, {blue}) at {image_x}, {image_y}"
-            )
-
-    def reset_background_color(self) -> None:
-        self.original_canvas.set_pick_enabled(False)
-        self._set_background_color(PURE_GREEN, invalidate_result=True)
-        self._select_background_mode(MODE_COLOR)
-        self._update_status("Background color reset to pure green")
+        self._apply_background_color_choice((red, green, blue))
+        self._update_status(f"Picked RGB({red}, {green}, {blue}) at {image_x}, {image_y}")
 
     def set_background_mode(self, _index: int | None = None) -> None:
         self.background_mode = self.mode_combo.currentData()
@@ -708,20 +694,34 @@ class MainWindow(QMainWindow):
         self._invalidate_result("Output mode changed. Process the image again.")
 
     def choose_replacement_color(self) -> None:
-        color = QColorDialog.getColor(
-            QColor(*self.replacement_color),
-            self,
-            "Choose Background Color",
+        color = self._choose_rgb_color(
+            current_color=self.replacement_color,
+            title="Choose Replacement Background Color",
         )
-        if not color.isValid():
+        if color is None:
             return
 
-        self._set_replacement_color(
-            (color.red(), color.green(), color.blue()),
-            invalidate_result=True,
-        )
+        self._set_replacement_color(color, invalidate_result=True)
         if self.output_mode != OUTPUT_SOLID:
             self._select_output_mode(OUTPUT_SOLID)
+
+    def _choose_rgb_color(
+        self,
+        current_color: tuple[int, int, int],
+        title: str,
+    ) -> tuple[int, int, int] | None:
+        color = QColorDialog.getColor(QColor(*current_color), self, title)
+        if not color.isValid():
+            return None
+        return (color.red(), color.green(), color.blue())
+
+    def _apply_background_color_choice(self, color: tuple[int, int, int]) -> None:
+        self._set_background_color(color, invalidate_result=True)
+
+        if self._is_light_neutral_color(color):
+            self._select_background_mode(MODE_LIGHT_NEUTRAL)
+        else:
+            self._select_background_mode(MODE_COLOR)
 
     def _first_supported_drop_path(self, event: QDragEnterEvent | QDropEvent) -> Path | None:
         if not event.mimeData().hasUrls():

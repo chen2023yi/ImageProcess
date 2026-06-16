@@ -13,7 +13,7 @@ def main() -> int:
     apply_theme(app)
 
     window = MainWindow()
-    window.show()
+    window.showMaximized()
 
     return app.exec()
 
