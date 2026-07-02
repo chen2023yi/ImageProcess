@@ -102,6 +102,12 @@ QPushButton#PrimaryButton:hover {
     border-color: #1D4ED8;
 }
 
+QPushButton#PrimaryButton:disabled {
+    background: #F2F4F7;
+    border-color: #E4E7EC;
+    color: #98A2B3;
+}
+
 QPushButton#SuccessButton {
     background: #16A34A;
     border-color: #16A34A;
@@ -111,6 +117,12 @@ QPushButton#SuccessButton {
 QPushButton#SuccessButton:hover {
     background: #15803D;
     border-color: #15803D;
+}
+
+QPushButton#SuccessButton:disabled {
+    background: #F2F4F7;
+    border-color: #E4E7EC;
+    color: #98A2B3;
 }
 
 QPushButton#DropButton {

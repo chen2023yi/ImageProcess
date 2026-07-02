@@ -5,3 +5,5 @@ venv/
 dist/
 build/
 *.spec
+models/rembg/*.onnx
+models/rembg/*.onnx.*

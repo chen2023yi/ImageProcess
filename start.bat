@@ -19,7 +19,7 @@ if not defined PYTHON_CMD (
     exit /b 1
 )
 
-%PYTHON_CMD% -c "import PySide6, PIL, numpy" >nul 2>&1
+%PYTHON_CMD% -c "import PySide6, PIL, numpy, cv2, onnxruntime" >nul 2>&1
 if errorlevel 1 (
     echo Installing required packages...
     %PYTHON_CMD% -m pip install -r requirements.txt
